@@ -2,7 +2,10 @@ import socket
 import threading
 import time
 import numpy as np
-import libh264decoder
+import cv2
+#import libh264decoder
+
+tello_video = cv2.VideoCapture('udp://@0.0.0.0:11111')
 
 class Tello:
     """Wrapper class to interact with the Tello drone."""
@@ -22,7 +25,7 @@ class Tello:
         """
 
         self.abort_flag = False
-        self.decoder = libh264decoder.H264Decoder()
+        #self.decoder = libh264decoder.H264Decoder()
         self.command_timeout = command_timeout
         self.imperial = imperial
         self.response = None  
@@ -32,7 +35,7 @@ class Tello:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # socket for sending cmd
         self.socket_video = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # socket for receiving video stream
         self.tello_address = (tello_ip, tello_port)
-        self.local_video_port = 11111  # port for receiving video stream
+        #self.local_video_port = 11111  # port for receiving video stream
         self.last_height = 0
         self.socket.bind((local_ip, local_port))
 
@@ -48,7 +51,7 @@ class Tello:
         self.socket.sendto(b'streamon', self.tello_address)
         print ('sent: streamon')
 
-        self.socket_video.bind((local_ip, self.local_video_port))
+        #self.socket_video.bind((local_ip, self.local_video_port))
 
         # thread for receiving video
         self.receive_video_thread = threading.Thread(target=self._receive_video_thread)
@@ -60,7 +63,8 @@ class Tello:
         """Closes the local socket."""
 
         self.socket.close()
-        self.socket_video.close()
+        tello_video.release()
+        cv2.destroyAllWindows()
     
     def read(self):
         """Return the last frame from camera."""
@@ -95,11 +99,22 @@ class Tello:
         Runs as a thread, sets self.frame to the most recent frame Tello captured.
 
         """
+        
         packet_data = ""
         while True:
             try:
+                ret, frame = tello_video.read()
+                if ret: 
+                    cv2.imshow('Tello', frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            except Exception as err:
+                print(err)
+            """
+            try:
                 res_string, ip = self.socket_video.recvfrom(2048)
-                packet_data += res_string
+                #print(res_string)
+                packet_data += str(res_string)
                 # end of frame
                 if len(res_string) != 1460:
                     for frame in self._h264_decode(packet_data):
@@ -108,7 +123,7 @@ class Tello:
 
             except socket.error as exc:
                 print ("Caught exception socket.error : %s" % exc)
-    
+            """
     def _h264_decode(self, packet_data):
         """
         decode raw h264 format data from Tello
